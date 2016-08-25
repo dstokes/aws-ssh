@@ -35,6 +35,19 @@ done
 # set positional arguments in their proper place
 eval set -- "$PARAMS"
 
+ip() {
+  echo $1 | awk '{print $3}'
+}
+
+connect() {
+  local USER=$1
+  local HOST=$2
+  echo "Connecting to host $HOST as $USER.."
+  test -n "$USER" && HOST="$USER@$HOST"
+  ssh "$HOST" -o ServerAliveInterval=10 -o ConnectTimeout=10 -o LogLevel=Error -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $3
+  exit $?
+}
+
 test -z "$1" && { echo $HELP; exit 0; }
 
 # check for user in host name
@@ -51,11 +64,13 @@ TABLE=$(aws ec2 describe-instances \
 
 test -z "$TABLE" && { echo "No hosts found"; exit 0; }
 
+COUNT=$(echo "$TABLE" | wc -l)
+if [[ $COUNT -eq 1 ]]; then
+  connect "$USER" $(ip "$TABLE") "${@:2}"
+fi
+
 IFS=$'\n'
 select r in $TABLE; do
-  HOST=$(echo $r | awk '{print $3}')
-  echo "Connecting to host $HOST as $USER.."
-  test -n "$USER" && HOST="$USER@$HOST"
-  ssh $HOST -o ServerAliveInterval=10 -o ConnectTimeout=10 -o LogLevel=Error -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $2
+  connect "$USER" $(ip "$r") "${@:2}"
   break
 done
