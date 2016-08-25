@@ -1,0 +1,61 @@
+#!/bin/bash
+# vi: ft=sh
+
+PARAMS=""
+NAME=$0
+REGION=us-east-1
+PROFILE="default"
+HELP="Usage: $(basename $0) [-h] [[user@]host] [--profile aws_profile] [--region aws_region]"
+
+while (( "$#" )); do
+  case "$1" in
+    --profile)
+      PROFILE=$2
+      shift 2
+      ;;
+    --region)
+      REGION=$2
+      shift 2
+      ;;
+    -h|--help)
+      echo $HELP
+      exit 0
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+test -z "$1" && { echo $HELP; exit 0; }
+
+# check for user in host name
+read -r USER HOST <<< $(echo -n $1 | tr "@" " ")
+test -z "$HOST" && HOST=$USER USER=""
+
+TABLE=$(aws ec2 describe-instances \
+  --region $REGION \
+  --profile $PROFILE \
+  --output text \
+  --query 'Reservations[].Instances[].{a: Tags[?Key==`Name`].Value | [0], b: InstanceId, c: PrivateIpAddress, d: PublicIpAddress, e: Tags[?Key==`Roles`].Value | [0]}' \
+    | awk 'tolower($1) ~ /'$HOST'/ {print}' \
+    | column -ts $'\t')
+
+test -z "$TABLE" && { echo "No hosts found"; exit 0; }
+
+IFS=$'\n'
+select r in $TABLE; do
+  HOST=$(echo $r | awk '{print $3}')
+  echo "Connecting to host $HOST as $USER.."
+  test -n "$USER" && HOST="$USER@$HOST"
+  ssh $HOST -o ServerAliveInterval=10 -o ConnectTimeout=10 -o LogLevel=Error -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $2
+  break
+done
