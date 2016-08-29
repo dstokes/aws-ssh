@@ -58,6 +58,7 @@ TABLE=$(aws ec2 describe-instances \
   --region $REGION \
   --profile $PROFILE \
   --output text \
+  --filters "Name=instance-state-name,Values=pending,running" \
   --query 'Reservations[].Instances[].{a: Tags[?Key==`Name`].Value | [0], b: InstanceId, c: PrivateIpAddress, d: PublicIpAddress, e: Tags[?Key==`Roles`].Value | [0]}' \
     | awk 'tolower($1) ~ /'$HOST'/ {print}' \
     | column -ts $'\t')
