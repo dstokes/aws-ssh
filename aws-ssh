@@ -5,7 +5,7 @@ PARAMS=""
 NAME=$0
 REGION=us-east-1
 PROFILE="default"
-HELP="Usage: $(basename $0) [-h] [[user@]host] [--profile aws_profile] [--region aws_region]"
+HELP="Usage: $(basename $0) [-hv] [[user@]host] [-i identity_file] [--profile aws_profile] [--region aws_region]"
 
 while (( "$#" )); do
   case "$1" in
@@ -17,9 +17,17 @@ while (( "$#" )); do
       REGION=$2
       shift 2
       ;;
+    -i)
+      IDENTITY_FILE=$2
+      shift 2
+      ;;
     -h|--help)
       echo $HELP
       exit 0
+      ;;
+    -v)
+      VERBOSE=1
+      shift 1
       ;;
     -*|--*=) # unsupported flags
       echo "Error: Unsupported flag $1" >&2
@@ -44,7 +52,10 @@ connect() {
   local HOST=$2
   echo "Connecting to host $HOST as $USER.."
   test -n "$USER" && HOST="$USER@$HOST"
-  ssh "$HOST" -o ServerAliveInterval=10 -o ConnectTimeout=10 -o LogLevel=Error -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $3
+  OPT='-o ServerAliveInterval=10 -o ConnectTimeout=10 -o LogLevel=Error -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  if [[ -n $IDENTITY_FILE ]]; then OPT="$OPT -i $IDENTITY_FILE"; fi
+  if [[ $VERBOSE -eq 1 ]]; then OPT="$OPT -v"; fi
+  eval "ssh $HOST $OPT $3"
   exit $?
 }
 
