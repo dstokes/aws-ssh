@@ -3,9 +3,10 @@
 
 PARAMS=""
 NAME=$0
+IP=private
 REGION=us-east-1
 PROFILE="default"
-HELP="Usage: $(basename $0) [-hv] [[user@]host] [-i identity_file] [--profile aws_profile] [--region aws_region]"
+HELP="Usage: $(basename $0) [-hv] [[user@]host] [--ip public|private] [-i identity_file] [--profile aws_profile] [--region aws_region]"
 
 while (( "$#" )); do
   case "$1" in
@@ -15,6 +16,10 @@ while (( "$#" )); do
       ;;
     --region)
       REGION=$2
+      shift 2
+      ;;
+    --ip)
+      IP=$2
       shift 2
       ;;
     -i)
@@ -44,7 +49,11 @@ done
 eval set -- "$PARAMS"
 
 ip() {
-  echo $1 | awk '{print $3}'
+  if [[ $IP == "public" ]]; then
+    echo $1 | awk '{print $4}'
+  else
+    echo $1 | awk '{print $3}'
+  fi
 }
 
 connect() {
@@ -70,8 +79,10 @@ TABLE=$(aws ec2 describe-instances \
   --profile $PROFILE \
   --output text \
   --filters "Name=instance-state-name,Values=pending,running" \
-  --query 'Reservations[].Instances[].{a: Tags[?Key==`Name`].Value | [0], b: InstanceId, c: PrivateIpAddress, d: PublicIpAddress, e: Tags[?Key==`Roles`].Value | [0]}' \
+  --query 'Reservations[].Instances[].{a: Tags[?Key==`Name`].Value | [0], b: InstanceId, c: PrivateIpAddress, d: PublicIpAddress, e: Tags[?Key==`Roles`].Value | [0], f: LaunchTime}' \
+    | sort -k6 -r \
     | awk 'tolower($1) ~ /'$HOST'/ {print}' \
+    | awk 'BEGIN {OFS = "\t"} {gsub(substr($2, 2), "", $1); print}' \
     | column -ts $'\t')
 
 test -z "$TABLE" && { echo "No hosts found"; exit 0; }
@@ -84,5 +95,5 @@ fi
 IFS=$'\n'
 select r in $TABLE; do
   connect "$USER" $(ip "$r") "${@:2}"
-  break
+  bre ak
 done
