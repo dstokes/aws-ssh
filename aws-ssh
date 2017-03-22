@@ -95,5 +95,5 @@ fi
 IFS=$'\n'
 select r in $TABLE; do
   connect "$USER" $(ip "$r") "${@:2}"
-  bre ak
+  break
 done
