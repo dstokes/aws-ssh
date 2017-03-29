@@ -39,7 +39,7 @@ while (( "$#" )); do
       exit 1
       ;;
     *) # preserve positional arguments
-      PARAMS="$PARAMS $1"
+      PARAMS="$PARAMS \"$1\""
       shift
       ;;
   esac
